@@ -31,6 +31,7 @@ qt_add_qml_module(ECULogAnalyzer
     VERSION 1.0
     QML_FILES
         Main.qml
+        RESOURCES README.md
 )
 
 # Настройки линковки для Windows (скрытие консоли в Release)

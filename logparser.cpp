@@ -55,7 +55,7 @@ bool LogParser::loadFile(const QString &filePath)
     }
 
     // Инициализируем векторы под каждый заголовок
-    for (const auto &header : newLog.headers) {
+    for (const auto &header : std::as_const(newLog.headers)) {
         newLog.dataMap[header] = QVector<double>();
     }
 
@@ -202,6 +202,8 @@ void LogParser::generate3DMatrix(QSurface3DSeries *series,
 
             // СОХРАНЯЕМ ТЕКУЩЕЕ ЗНАЧЕНИЕ ДЛЯ МАРКЕРА
             m_currentGrid[x][z] = finalGrid[x][z];
+            // Сохраняем счетчик попаданий
+            m_currentHitGrid[x][z] = hitGrid[x][z];
 
             row.append(QSurfaceDataItem(QVector3D(xCoord,
                                                   static_cast<float>(finalGrid[x][z]),
@@ -298,3 +300,8 @@ void LogParser::applyFormula(int row, int col, const QString &formulaStr)
     m_currentGrid[row][col] = result;
 }
 
+int LogParser::getHitCount(int row, int col) const
+{
+    if (row < 0 || row >= 16 || col < 0 || col >= 16) return 0;
+    return m_currentHitGrid[row][col];
+}

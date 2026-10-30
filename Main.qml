@@ -348,74 +348,139 @@ ApplicationWindow {
                     }
                 }
 
-                Surface3D {
-                    id: graph3D
-                    // Задаем размеры через свойства Layout вместо width/height
+                // Общий контейнер, который позволяет накладывать элементы друг на друга
+                Item {
+                    id: container
                     Layout.fillWidth: true
                     Layout.fillHeight: true
 
-                    // Было: selectionMode: AbstractGraph3D.SelectionSlice | AbstractGraph3D.SelectionItem
-                    // Стало под синтаксис Qt Graphs 6.10:
-                    selectionMode: Graphs3D.SelectionFlag.Item
+                    Surface3D {
+                        id: graph3D
+                        // Задаем размеры через свойства Layout вместо width/height
+                        // Layout.fillWidth: true
+                        // Layout.fillHeight: true
 
-                    theme: GraphsTheme {
-                        theme: GraphsTheme.Theme.UserDefined
-                        colorStyle: GraphsTheme.ColorStyle.RangeGradient
-                        // Для RangeGradient/ObjectGradient настраиваем градиенты:
-                        baseGradients: [
-                            Gradient {
-                                GradientStop { position: 0.0; color: "#0000ff" } // Синий (низ)
-                                GradientStop { position: 0.5; color: "#00ff00" } // Зеленый (середина)
-                                GradientStop { position: 1.0; color: "#ff0000" } // Красный (верх)
+                        width: container.width
+                        height: container.height
+
+                        // Было: selectionMode: AbstractGraph3D.SelectionSlice | AbstractGraph3D.SelectionItem
+                        // Стало под синтаксис Qt Graphs 6.10:
+                        selectionMode: Graphs3D.SelectionFlag.Item
+
+                        theme: GraphsTheme {
+                            theme: GraphsTheme.Theme.UserDefined
+                            colorStyle: GraphsTheme.ColorStyle.RangeGradient
+                            // Для RangeGradient/ObjectGradient настраиваем градиенты:
+                            baseGradients: [
+                                Gradient {
+                                    GradientStop { position: 0.0; color: "#0000ff" } // Синий (низ)
+                                    GradientStop { position: 0.5; color: "#00ff00" } // Зеленый (середина)
+                                    GradientStop { position: 1.0; color: "#ff0000" } // Красный (верх)
+                                }
+                            ]
+                        }
+
+                        // ---- Добавляем и привязываем оси под ТЗ ----
+                        axisX: Value3DAxis {
+                            title: xAxisCombo.currentText // Подпись оси X (например, RPM)
+                            min: 0.0
+                            max: 15.0
+                            subSegmentCount: 1
+                            titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
+                        }
+
+                        axisZ: Value3DAxis {
+                            title: yAxisCombo.currentText // Подпись оси Z (например, THR)
+                            min: 0.0
+                            max: 15.0
+                            subSegmentCount: 1
+                            titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
+                        }
+
+                        axisY: Value3DAxis {
+                            title: zAxisCombo.currentText // Подпись оси Y (Высота — например, UOZ)
+                            // Автоматическое масштабирование высоты в зависимости от значений лога
+                            segmentCount: 5
+                            titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
+                        }
+
+                        Surface3DSeries {
+                            id: surfaceSeries
+                            shading: Surface3DSeries.Shading.Smooth
+                            drawMode: Surface3DSeries.DrawSurfaceAndWireframe
+
+                            // Отслеживаем клик и перемещение маркера по сетке
+                            onSelectedPointChanged: (position) => {
+                                if (position.x === -1 || position.y === -1) {
+                                    markerLabel.text = qsTr("Кликните на карту для замера параметров")
+                                    return;
+                                }
+
+                                // Считываем точное значение из C++ по скорректированным индексам
+                                var val = logParser.getMatrixValue(position.y, position.x)
+                                // Запрашиваем число попаданий для выбранной точки из C++
+                                var hits = logParser.getHitCount(position.y, position.x)
+
+                                markerLabel.text =
+                                    xAxisCombo.currentText + " (Индекс X: " + position.y + ") | " +
+                                    yAxisCombo.currentText + " (Индекс Z: " + position.x + ") | " +
+                                    zAxisCombo.currentText + " = " + val.toFixed(2)+
+                                    " [Попаданий: " + hits + "]" // Выводим Hit Count на экран (Пункт 8 ТЗ)
                             }
-                        ]
-                    }
-
-                    // ---- Добавляем и привязываем оси под ТЗ ----
-                    axisX: Value3DAxis {
-                        title: xAxisCombo.currentText // Подпись оси X (например, RPM)
-                        min: 0.0
-                        max: 15.0
-                        subSegmentCount: 1
-                        titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
-                    }
-
-                    axisZ: Value3DAxis {
-                        title: yAxisCombo.currentText // Подпись оси Z (например, THR)
-                        min: 0.0
-                        max: 15.0
-                        subSegmentCount: 1
-                        titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
-                    }
-
-                    axisY: Value3DAxis {
-                        title: zAxisCombo.currentText // Подпись оси Y (Высота — например, UOZ)
-                        // Автоматическое масштабирование высоты в зависимости от значений лога
-                        segmentCount: 5
-                        titleVisible: true // ОБЯЗАТЕЛЬНО ДЛЯ QT GRAPHS
-                    }
-
-                    Surface3DSeries {
-                        id: surfaceSeries
-                        shading: Surface3DSeries.Shading.Smooth
-                        drawMode: Surface3DSeries.DrawSurfaceAndWireframe
-
-                        // Отслеживаем клик и перемещение маркера по сетке
-                        onSelectedPointChanged: (position) => {
-                            if (position.x === -1 || position.y === -1) {
-                                markerLabel.text = qsTr("Кликните на карту для замера параметров")
-                                return;
-                            }
-
-                            // Считываем точное значение из C++ по скорректированным индексам
-                            var val = logParser.getMatrixValue(position.y, position.x)
-
-                            markerLabel.text =
-                                xAxisCombo.currentText + " (Индекс X: " + position.y + ") | " +
-                                yAxisCombo.currentText + " (Индекс Z: " + position.x + ") | " +
-                                zAxisCombo.currentText + " = " + val.toFixed(2)
                         }
                     }
+
+                    // РАЗМЕЩАЕМ MOUSEAREA НАД ГРАФИКОМ
+                    // Перехватчик кликов мыши для вызова меню по ПКМ
+                    // Обработка правого клика для вызова меню над поверхностью 3D
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: {
+                            // Проверяем, есть ли элементы в массиве заголовков
+                            if (zAxisCombo.model.length > 0) {
+                                contextMenu.popup() // Открываем обычное меню
+                            } else {
+                                emptyMenu.popup()   // Открываем заглушку
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- ДИНАМИЧЕСКОЕ КОНТЕНТСТНОЕ МЕНЮ (Пункт 4 ТЗ) ---
+            Menu {
+                id: contextMenu
+
+                Instantiator {
+                    model: zAxisCombo.model.filter(function(header) {
+                        // Условие: оставляем строки, длина которых больше 3 символов
+                        return (header !== "TIME" && header !== "RPM" && header !== "THR");
+                    })
+
+                    onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
+                    onObjectRemoved: (index, object) => contextMenu.removeItem(object)
+
+                    delegate: MenuItem {
+                        text: modelData
+                        onTriggered: {
+                            // Здесь ваша логика управления Surface3D
+                            var idx = zAxisCombo.find(text)
+                            if (idx !== -1) {
+                                zAxisCombo.currentIndex = idx
+                                update3DGraph()
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Меню-заглушка для пустого состояния
+            Menu {
+                id: emptyMenu
+
+                MenuItem {
+                    text: "Нет загруженных логов"
+                    enabled: false // Делаем пункт серым и некликабельным
                 }
             }
         }

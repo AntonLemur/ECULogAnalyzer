@@ -61,6 +61,7 @@ public:
             emit activeLogIndexChanged(); // <- Оповещаем QML
         }
     }
+    Q_INVOKABLE int getHitCount(int row, int col) const;
 
     QStringList loadedLogs() const { return m_loadedLogNames; }
 
@@ -76,6 +77,7 @@ private:
     QVector<LogFileData> m_logs;       // Хранилище до 10 логов
     QStringList m_loadedLogNames;      // Список имен для QML SideBar/Combo
     double m_currentGrid[16][16] = {0.0};
+    int m_currentHitGrid[16][16] = {0};
     int m_activeLogIndex = 0;
 };
 

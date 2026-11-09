@@ -62,6 +62,10 @@ public:
         }
     }
     Q_INVOKABLE int getHitCount(int row, int col) const;
+    Q_INVOKABLE bool exportMatrixToCsv(const QString &filePath, const QString &xTitle, const QString &yTitle, const QString &zTitle);
+
+    Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
+    int progress() const { return m_progress; }
 
     QStringList loadedLogs() const { return m_loadedLogNames; }
 
@@ -70,6 +74,7 @@ signals:
     void errorOccurred(const QString &message);
     void searchProgress(int current, int total); // Отображение хода поиска (Пункт 4 ТЗ)
     void activeLogIndexChanged();
+    void progressChanged();
 
 private:
     char detectSeparator(const QString &headerLine);
@@ -79,6 +84,7 @@ private:
     double m_currentGrid[16][16] = {0.0};
     int m_currentHitGrid[16][16] = {0};
     int m_activeLogIndex = 0;
+    int m_progress = 0;
 };
 
 #endif // LOGPARSER_H

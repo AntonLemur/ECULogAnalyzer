@@ -211,6 +211,28 @@ ApplicationWindow {
                     }
                 }
 
+                // Разместить на левой панели под ListView со списком логов:
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    // Показываем прогресс-бар, только если идет активный процесс загрузки (от 1 до 99%)
+                    visible: logParser.progress > 0 && logParser.progress < 100
+
+                    Label {
+                        text: qsTr("Загрузка и квантование лога: ") + logParser.progress + "%"
+                        font.pixelSize: 11
+                        color: "#7f8c8d"
+                    }
+
+                    ProgressBar {
+                        id: loadProgressBar
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 100
+                        value: logParser.progress
+                    }
+                }
+
                 Label { text: qsTr("Ось X (Строки):") }
                 ComboBox {
                     id: xAxisCombo
@@ -314,6 +336,34 @@ ApplicationWindow {
                         text: "Переменные: V - значение, X - инд. X, Z - инд. Z"
                         font.pixelSize: 10
                         color: "#7f8c8d"
+                    }
+                }
+
+                // Кнопка на левой панели под блоком калькулятора:
+                Button {
+                    text: qsTr("Экспорт карты в CSV")
+                    Layout.fillWidth: true
+                    enabled: logParser.loadedLogs.length > 0 // Активна, если лог загружен
+                    onClicked: saveFileDialog.open()
+                }
+
+                // Компонент диалога (разместить на одном уровне с ApplicationWindow)
+                FileDialog {
+                    id: saveFileDialog
+                    title: qsTr("Сохранить откалиброванную карту")
+                    currentFile: "file:///exported_map.csv"
+                    fileMode: FileDialog.SaveFile
+                    nameFilters: ["Калибровочная матрица (*.csv)"]
+                    onAccepted: {
+                        var success = logParser.exportMatrixToCsv(
+                            saveFileDialog.selectedFile,
+                            xAxisCombo.currentText,
+                            yAxisCombo.currentText,
+                            zAxisCombo.currentText
+                        )
+                        if (success) {
+                            markerLabel.text = qsTr("Карта калибровки успешно экспортирована!")
+                        }
                     }
                 }
 

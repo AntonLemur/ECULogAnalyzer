@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <cmath>
 #include <QJSEngine>
+#include <QCoreApplication>
 
 LogParser::LogParser(QObject *parent) : QObject(parent) {}
 
@@ -40,6 +41,9 @@ bool LogParser::loadFile(const QString &filePath)
         return false;
     }
 
+    qint64 totalBytes = file.size(); // Узнаем "Всего" из метаданных ОС
+    if (totalBytes == 0) return false;
+
     QTextStream in(&file);
     if (in.atEnd()) return false;
 
@@ -61,6 +65,9 @@ bool LogParser::loadFile(const QString &filePath)
 
     // Чтение данных
     int rowCounter = 0;
+    int lastReportedProgress = 0;
+    m_progress = 0;
+    emit progressChanged();
     while (!in.atEnd()) {
         QString line = in.readLine();
         if (line.isEmpty()) continue;
@@ -71,8 +78,27 @@ bool LogParser::loadFile(const QString &filePath)
         for (int i = 0; i < newLog.headers.size(); ++i) {
             newLog.dataMap[newLog.headers[i]].append(tokens[i].toDouble());
         }
+
+        // Считаем прогресс по текущей позиции файла в байтах
+        qint64 currentBytes = file.pos();
+        int currentProgress = static_cast<int>((currentBytes * 100) / totalBytes);
+
+        // Обновляем свойство и шлем сигнал в QML только при изменении процента,
+        // чтобы не перегружать графический поток лишними событиями
+        if (currentProgress > lastReportedProgress) {
+            lastReportedProgress = currentProgress;
+            m_progress = currentProgress;
+            emit progressChanged();
+
+            // Позволяем QML-интерфейсу перерисоваться во время тяжелого цикла
+            QCoreApplication::processEvents();
+        }
+
         rowCounter++;
     }
+
+    m_progress = 100;
+    emit progressChanged();
 
     newLog.rowCount = rowCounter;
     m_logs.append(newLog);
@@ -304,4 +330,42 @@ int LogParser::getHitCount(int row, int col) const
 {
     if (row < 0 || row >= 16 || col < 0 || col >= 16) return 0;
     return m_currentHitGrid[row][col];
+}
+
+bool LogParser::exportMatrixToCsv(const QString &filePath, const QString &xTitle, const QString &yTitle, const QString &zTitle)
+{
+    QString cleanPath = filePath;
+    if (cleanPath.startsWith("file:///")) {
+        cleanPath = QUrl(filePath).toLocalFile();
+    }
+
+    QFile file(cleanPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit errorOccurred(tr("Не удалось создать файл для экспорта: %1").arg(file.errorString()));
+        return false;
+    }
+
+    QTextStream out(&file);
+
+    // Записываем шапку с метаданными осей
+    out << "# Map Export: X=" << xTitle << ", Z=" << yTitle << ", Target Y(Height)=" << zTitle << "\n";
+
+    // Заголовки столбцов (Индексы оси Z/нагрузки от 0 до 15)
+    out << "Row/Col";
+    for (int col = 0; col < 16; ++col) {
+        out << ",Z_Col_" << col;
+    }
+    out << "\n";
+
+    // Построчно выгружаем рабочую матрицу
+    for (int row = 0; row < 16; ++row) {
+        out << "X_Row_" << row; // Первый столбец — индекс оси X/оборотов
+        for (int col = 0; col < 16; ++col) {
+            out << "," << QString::number(m_currentGrid[row][col], 'f', 4);
+        }
+        out << "\n";
+    }
+
+    file.close();
+    return true;
 }
